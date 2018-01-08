@@ -1,8 +1,9 @@
 const React = require('react');
-const { Component } = React;
+const {
+  PropTypes,
+  Component,
+} = React;
 const { ViewPropTypes } = ReactNative = require('react-native');
-const createReactClass = require('create-react-class');
-const PropTypes = require('prop-types');
 const {
   Dimensions,
   View,
@@ -23,7 +24,7 @@ const AnimatedViewPagerAndroid = Platform.OS === 'android' ?
   Animated.createAnimatedComponent(ViewPagerAndroid) :
   undefined;
 
-const ScrollableTabView = createReactClass({
+const ScrollableTabView = React.createClass({
   mixins: [TimerMixin, ],
   statics: {
     DefaultTabBar,
@@ -218,7 +219,7 @@ const ScrollableTabView = createReactClass({
   renderScrollableContent() {
     if (Platform.OS === 'ios') {
       const scenes = this._composeScenes();
-      return <Animated.ScrollView
+      return <Animated.ScrollView  style={{borderWidth:0,height:(!this.props.isShowPage?0:null)}}
         horizontal
         pagingEnabled
         automaticallyAdjustContentInsets={false}
@@ -329,23 +330,21 @@ const ScrollableTabView = createReactClass({
   _handleLayout(e) {
     const { width, } = e.nativeEvent.layout;
 
-    if (!width || width <= 0 || Math.round(width) === Math.round(this.state.containerWidth)) {
-      return;
+    if (Math.round(width) !== Math.round(this.state.containerWidth)) {
+      if (Platform.OS === 'ios') {
+        const containerWidthAnimatedValue = new Animated.Value(width);
+        // Need to call __makeNative manually to avoid a native animated bug. See
+        // https://github.com/facebook/react-native/pull/14435
+        containerWidthAnimatedValue.__makeNative();
+        scrollValue = Animated.divide(this.state.scrollXIOS, containerWidthAnimatedValue);
+        this.setState({ containerWidth: width, scrollValue, });
+      } else {
+        this.setState({ containerWidth: width, });
+      }
+      this.requestAnimationFrame(() => {
+        this.goToPage(this.state.currentPage);
+      });
     }
-    
-    if (Platform.OS === 'ios') {
-      const containerWidthAnimatedValue = new Animated.Value(width);
-      // Need to call __makeNative manually to avoid a native animated bug. See
-      // https://github.com/facebook/react-native/pull/14435
-      containerWidthAnimatedValue.__makeNative();
-      scrollValue = Animated.divide(this.state.scrollXIOS, containerWidthAnimatedValue);
-      this.setState({ containerWidth: width, scrollValue, });
-    } else {
-      this.setState({ containerWidth: width, });
-    }
-    this.requestAnimationFrame(() => {
-      this.goToPage(this.state.currentPage);
-    });
   },
 
   _children(children = this.props.children) {
@@ -362,6 +361,10 @@ const ScrollableTabView = createReactClass({
       containerWidth: this.state.containerWidth,
     };
 
+    let isShowPage = true ;
+		if (typeof(this.props.isShowPage)!=="undefined") {
+			isShowPage = this.props.isShowPage;
+		}
     if (this.props.tabBarBackgroundColor) {
       tabBarProps.backgroundColor = this.props.tabBarBackgroundColor;
     }
@@ -386,7 +389,7 @@ const ScrollableTabView = createReactClass({
       };
     }
 
-    return <View style={[styles.container, this.props.style, ]} onLayout={this._handleLayout}>
+    return <View style={[isShowPage?styles.container:null, this.props.style]} onLayout={this._handleLayout}>
       {this.props.tabBarPosition === 'top' && this.renderTabBar(tabBarProps)}
       {this.renderScrollableContent()}
       {(this.props.tabBarPosition === 'bottom' || overlayTabs) && this.renderTabBar(tabBarProps)}
